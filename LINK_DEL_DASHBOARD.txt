@@ -1,0 +1,11 @@
+
+TU ENLACE DEL DASHBOARD:
+-------------------------------------------------------------------------
+https://Chanzes01.github.io/monitor-precio-europa/dashboard.html
+-------------------------------------------------------------------------
+
+Instrucciones:
+1. Copia el enlace completo y pégalo en tu navegador.
+2. Ese es el enlace que debes compartir con otros.
+
+Nota: Si al abrirlo sale error 404, espera unos minutos. GitHub tarda un poco en publicar la web por primera vez.

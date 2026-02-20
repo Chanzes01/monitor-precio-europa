@@ -1,0 +1,52 @@
+[
+    {
+        "name": "fecha",
+        "type": "DATE",
+        "mode": "REQUIRED"
+    },
+    {
+        "name": "pais_origen",
+        "type": "STRING",
+        "mode": "REQUIRED"
+    },
+    {
+        "name": "descripcion_original",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "tipo_vino",
+        "type": "STRING",
+        "mode": "REQUIRED"
+    },
+    {
+        "name": "precio_eur_hl",
+        "type": "FLOAT",
+        "mode": "REQUIRED"
+    },
+    {
+        "name": "moneda",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "fuente",
+        "type": "STRING",
+        "mode": "REQUIRED"
+    },
+    {
+        "name": "costo_transaccion_estimado",
+        "type": "FLOAT",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "margen_potencial",
+        "type": "FLOAT",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "es_oportunidad",
+        "type": "BOOLEAN",
+        "mode": "NULLABLE"
+    }
+]

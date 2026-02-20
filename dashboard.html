@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor Precio Europa - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+        }
+    </style>
+</head>
+
+<body class="p-8">
+    <header class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-800">🇪🇺 Monitor Precio Vino Europa</h1>
+        <p class="text-gray-600">Oportunidades de Arbitraje (España -> Francia/Italia)</p>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="card border-l-4 border-blue-500">
+            <h2 class="text-sm font-semibold text-gray-500 uppercase">Precio Promedio España</h2>
+            <p class="text-3xl font-bold text-gray-800" id="avg-price-es">-- €/l</p>
+        </div>
+        <div class="card border-l-4 border-green-500">
+            <h2 class="text-sm font-semibold text-gray-500 uppercase">Oportunidades Detectadas</h2>
+            <p class="text-3xl font-bold text-gray-800" id="opportunity-count">--</p>
+        </div>
+        <div class="card border-l-4 border-purple-500">
+            <h2 class="text-sm font-semibold text-gray-500 uppercase">Margen Máximo Estimado</h2>
+            <p class="text-3xl font-bold text-gray-800" id="max-margin">-- €/l</p>
+        </div>
+    </div>
+
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">Monitor de Precios de Vino (Europa)</h1>
+            <p class="text-gray-600">Precios spot en tiempo real y costos de transacción estimados</p>
+        </div>
+        <div class="flex gap-4">
+            <!-- Filter Dropdown -->
+            <select id="varietalFilter" onchange="applyFilters()" class="p-2 border rounded shadow-sm">
+                <option value="all">Todo</option>
+                <option value="White">Blanco</option>
+                <option value="Red">Tinto</option>
+            </select>
+            <select id="formatFilter" onchange="applyFilters()" class="p-2 border rounded shadow-sm">
+                <option value="all">Todos los Formatos</option>
+                <option value="Granel">Granel</option>
+                <option value="Embotellado">Embotellado</option>
+            </select>
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <span class="block text-sm text-gray-500">Precio España (Actual)</span>
+                <span id="avg-price-es-filter" class="text-2xl font-bold text-yellow-600">-- €/l</span>
+            </div>
+            <button onclick="downloadExcel()"
+                class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow-sm flex items-center gap-2 transition-colors">
+                <span>📊</span> Descargar Excel
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Chart -->
+    <div class="card mb-8">
+        <h2 class="text-xl font-bold mb-4">Historia de Precios (2020-2026) [€/litro]</h2>
+        <canvas id="priceChart" height="100"></canvas>
+    </div>
+
+    <!-- 3D Pie Charts Section -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <!-- Chart: Pais -->
+        <div class="card min-h-[300px]" id="chart_pais"></div>
+        <!-- Chart: Tipo -->
+        <div class="card min-h-[300px]" id="chart_tipo"></div>
+        <!-- Chart: Formato -->
+        <div class="card min-h-[300px]" id="chart_formato"></div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="card overflow-hidden mb-8">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold">Últimos Datos (Granel sin DOP/IGP)</h2>
+            <p class="text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded border border-gray-200">
+                ℹ️ Haz clic en los títulos para ordenar <span class="text-red-600 font-bold">▼</span>
+            </p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-left text-sm whitespace-nowrap">
+                <thead>
+                    <tr class="bg-gray-100 border-b">
+                        <th class="p-4 font-semibold text-gray-700 cursor-pointer select-none hover:bg-gray-200 transition-colors"
+                            onclick="handleSort('fecha')">
+                            Fecha <span id="sort-icon-fecha" class="text-red-600 font-bold text-lg">↕</span>
+                        </th>
+                        <th class="p-4 font-semibold text-gray-700 cursor-pointer select-none hover:bg-gray-200 transition-colors"
+                            onclick="handleSort('pais_origen')">
+                            País <span id="sort-icon-pais_origen" class="text-red-600 font-bold text-lg">↕</span>
+                        </th>
+                        <th class="p-4 font-semibold text-gray-700 cursor-pointer select-none hover:bg-gray-200 transition-colors"
+                            onclick="handleSort('tipo_vino')">
+                            Tipo <span id="sort-icon-tipo_vino" class="text-red-600 font-bold text-lg">↕</span>
+                        </th>
+                        <th class="p-4 font-semibold text-gray-700 cursor-pointer select-none hover:bg-gray-200 transition-colors"
+                            onclick="handleSort('formato')">
+                            Formato <span id="sort-icon-formato" class="text-red-600 font-bold text-lg">↕</span>
+                        </th>
+                        <th class="p-4 font-semibold text-gray-700 cursor-pointer select-none hover:bg-gray-200 transition-colors"
+                            onclick="handleSort('precio_eur_hl')">
+                            Precio (€/l) <span id="sort-icon-precio_eur_hl"
+                                class="text-red-600 font-bold text-lg">↕</span>
+                        </th>
+
+                        <th class="p-4 font-semibold text-gray-700 cursor-pointer select-none hover:bg-gray-200 transition-colors"
+                            onclick="handleSort('fuente')">
+                            Fuente <span id="sort-icon-fuente" class="text-red-600 font-bold text-lg">↕</span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="data-table-body" class="divide-y divide-gray-200">
+                    <!-- Rows will be populated by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Sources List -->
+    <div class="card mb-8">
+        <h2 class="text-xl font-bold mb-4">Fuentes de Datos</h2>
+        <ul class="list-disc list-inside text-gray-700 space-y-2">
+            <li><strong>DG AGRI (Comisión Europea):</strong> Precios oficiales de mercado para vinos sin DOP/IGP
+                (actualización semanal/mensual).</li>
+            <li><strong>Eurostat (Comext):</strong> Datos de comercio internacional (Exportaciones FOB) para monitorizar
+                flujos reales.</li>
+            <li><strong>ISMEA (Italia):</strong> Instituto de Servicios para el Mercado Agrícola Alimentario (Reportes
+                sectoriales).</li>
+            <li><strong>Cooperativas Agroalimentarias Castilla-La Mancha (España):</strong> Boletines de precios de
+                referencia para la zona centro (Lonja Ciudad Real).</li>
+        </ul>
+    </div>
+
+    <!-- Credits -->
+    <div class="text-center text-gray-500 text-sm mb-8">
+        <p>Realizado por Agente <strong>Antigravity</strong> 🚀</p>
+    </div>
+
+    <script src="https://www.gstatic.com/charts/loader.js"></script> <!-- Google Charts -->
+    <script src="data.js"></script> <!-- Loads WINE_DATA variable -->
+
+    <script>
+        // --- Google Charts Init ---
+        let googleChartsLoaded = false;
+        google.charts.load("current", { packages: ["corechart"] });
+        google.charts.setOnLoadCallback(() => {
+            googleChartsLoaded = true;
+            applyFilters(); // Re-render to show pies
+        });
+
+        // --- Logic ---
+
+        let allData = []; // Store global data for filtering
+        let currentSort = { column: 'fecha', direction: 'desc' };
+
+        async function loadData() {
+            try {
+                if (typeof WINE_DATA !== 'undefined') {
+                    console.log("Loading data from data.js");
+                    allData = WINE_DATA;
+                    // Initial sort and render
+                    applyFilters();
+                    return;
+                }
+
+                // Fallback to fetch if WINE_DATA is not defined
+                console.log("WINE_DATA not found, trying fetch...");
+                const response = await fetch('latest_data.json');
+                if (!response.ok) throw new Error("No data file found");
+                allData = await response.json();
+                applyFilters();
+            } catch (error) {
+                console.log("Loading placeholder data...", error);
+                // Placeholder
+                allData = [
+                    { fecha: '2025-02-14', pais_origen: 'ES', tipo_vino: 'White', precio_eur_hl: 35.5, formato: 'Granel', fuente: 'Simulación' },
+                    { fecha: '2025-02-14', pais_origen: 'IT', tipo_vino: 'White', precio_eur_hl: 42.0, formato: 'Granel', fuente: 'Simulación' }
+                ];
+                applyFilters();
+            }
+        }
+
+        function handleSort(column) {
+            if (currentSort.column === column) {
+                // Toggle direction
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                // New column, default to desc for everything (shows latest/highest first usually better)
+                currentSort.column = column;
+                currentSort.direction = 'desc';
+            }
+            applyFilters();
+        }
+
+        function updateSortIcons() {
+            // Reset all icons to neutral state but keep them RED and LARGE
+            const allIcons = document.querySelectorAll('[id^="sort-icon-"]');
+            allIcons.forEach(icon => {
+                icon.textContent = '↕';
+                icon.className = 'text-red-600 font-bold text-lg'; // User requested: like the red arrow
+            });
+
+            // Set current icon (Directional)
+            const currentIcon = document.getElementById(`sort-icon-${currentSort.column}`);
+            if (currentIcon) {
+                currentIcon.textContent = currentSort.direction === 'asc' ? '▲' : '▼';
+                currentIcon.className = 'text-red-600 font-bold text-lg'; // Same style, different icon
+            }
+        }
+
+        function applyFilters() {
+            const varietalFilter = document.getElementById('varietalFilter').value;
+            const formatFilter = document.getElementById('formatFilter').value;
+
+            let filtered = allData.filter(item => {
+                // User requested to remove limits, so we removed the price filter.
+
+                const matchV = varietalFilter === 'all' || item.tipo_vino === varietalFilter;
+                const matchF = formatFilter === 'all' || (item.formato || 'Granel') === formatFilter;
+                return matchV && matchF;
+            });
+
+            // 2. Sort
+            filtered.sort((a, b) => {
+                let valA = a[currentSort.column];
+                let valB = b[currentSort.column];
+
+                // Handle null/undefined
+                if (valA === undefined || valA === null) valA = '';
+                if (valB === undefined || valB === null) valB = '';
+
+                // Special handling for numeric columns that might be stored as strings
+                if (currentSort.column === 'precio_eur_hl' ||
+                    currentSort.column === 'costo_transaccion_estimado_fr' ||
+                    currentSort.column === 'costo_transaccion_estimado_it') {
+                    valA = parseFloat(valA) || 0;
+                    valB = parseFloat(valB) || 0;
+                }
+
+                // Date sorting
+                if (currentSort.column === 'fecha') {
+                    // Dates are YYYY-MM-DD so string sort is actually fine, but Date object is safer
+                    valA = new Date(valA);
+                    valB = new Date(valB);
+                }
+
+                if (valA < valB) return currentSort.direction === 'asc' ? -1 : 1;
+                if (valA > valB) return currentSort.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            updateSortIcons();
+
+            // Pass ALL filtered data to render
+            renderDashboard(filtered);
+
+            if (googleChartsLoaded) {
+                drawPieCharts(filtered);
+            }
+        }
+
+        function drawPieCharts(data) {
+            // 1. Aggregations
+            const countsPais = {};
+            const countsTipo = {};
+            const countsFormato = {};
+
+            data.forEach(d => {
+                // Pais
+                const p = d.pais_origen ? d.pais_origen.split(' ')[0] : 'Desconocido'; // Clean "ES Granel" to "ES"
+                countsPais[p] = (countsPais[p] || 0) + 1;
+
+                // Tipo
+                const t = d.tipo_vino || 'N/A';
+                countsTipo[t] = (countsTipo[t] || 0) + 1;
+
+                // Formato
+                const f = d.formato || 'Granel';
+                countsFormato[f] = (countsFormato[f] || 0) + 1;
+            });
+
+            // 2. Helper to build DataTable and Slices
+            function buildChartData(counts, colorMap) {
+                const dataArray = [['Label', 'Registros']];
+                const slices = {};
+                let index = 0;
+                
+                // Sort keys for consistent legend order if desired, or just iterate
+                Object.keys(counts).sort().forEach(key => {
+                    dataArray.push([key, counts[key]]);
+                    
+                    // Determine color
+                    if (colorMap) {
+                        // Check exact match or partial match keys
+                        let color = colorMap['default'] || '#9CA3AF';
+                        
+                        // Try exact match
+                        if (colorMap[key]) {
+                            color = colorMap[key];
+                        } else {
+                            // Try keyword match
+                            for (const [k, c] of Object.entries(colorMap)) {
+                                if (key.includes(k)) {
+                                    color = c;
+                                    break;
+                                }
+                            }
+                        }
+                        slices[index] = { color: color };
+                    }
+                    index++;
+                });
+                return { dataTable: google.visualization.arrayToDataTable(dataArray), slices: slices };
+            }
+
+            // 3. Define Color Maps
+            const colorMapPais = {
+                'ES': '#EAB308', // Yellow (Spain)
+                'FR': '#3B82F6', // Blue (France)
+                'IT': '#22C55E', // Green (Italy)
+                'PT': '#EF4444', // Red (Portugal)
+                'default': '#9CA3AF'
+            };
+
+            const colorMapTipo = {
+                'Red': '#991B1B',   // Dark Red
+                'Tinto': '#991B1B',
+                'White': '#FCD34D', // Gold/Yellow
+                'Blanco': '#FCD34D',
+                'default': '#A855F7'
+            };
+
+            const colorMapFormato = {
+                'Granel': '#10B981',      // Emerald Green
+                'Embotellado': '#8B5CF6', // Violet
+                'default': '#6B7280'
+            };
+
+            // 4. Draw Charts
+            // --- Pais ---
+            const pData = buildChartData(countsPais, colorMapPais);
+            const chartPais = new google.visualization.PieChart(document.getElementById('chart_pais'));
+            chartPais.draw(pData.dataTable, {
+                title: 'Distribución por País',
+                is3D: true,
+                backgroundColor: 'transparent',
+                legend: { position: 'bottom' },
+                slices: pData.slices
+            });
+
+            // --- Tipo ---
+            const tData = buildChartData(countsTipo, colorMapTipo);
+            const chartTipo = new google.visualization.PieChart(document.getElementById('chart_tipo'));
+            chartTipo.draw(tData.dataTable, {
+                title: 'Por Tipo de Vino',
+                is3D: true,
+                backgroundColor: 'transparent',
+                legend: { position: 'bottom' },
+                slices: tData.slices
+            });
+
+            // --- Formato ---
+            const fData = buildChartData(countsFormato, colorMapFormato);
+            const chartFormato = new google.visualization.PieChart(document.getElementById('chart_formato'));
+            chartFormato.draw(fData.dataTable, {
+                title: 'Por Formato',
+                is3D: true,
+                backgroundColor: 'transparent',
+                legend: { position: 'bottom' },
+                slices: fData.slices
+            });
+        }
+
+        function renderDashboard(data) {
+            const tbody = document.getElementById('data-table-body');
+            tbody.innerHTML = '';
+
+            // 1. Organize data by date for easier charting
+            const priceMap = {}; // date -> {ES: price, FR: price, IT: price }
+            const allDates = new Set();
+
+            data.forEach((row, index) => {
+                if (!allDates.has(row.fecha)) allDates.add(row.fecha);
+
+                // Convert HL price to Liter price
+                const priceLiter = row.precio_eur_hl / 100;
+
+                // Populate Chart Data (All types)
+                if (!priceMap[row.fecha]) priceMap[row.fecha] = {};
+                priceMap[row.fecha][row.pais_origen] = priceLiter;
+
+                // Limit Table Rows to top 100 to prevent browser crash
+                if (index < 100) {
+                    const tr = document.createElement('tr');
+                    let badgeClass = 'bg-gray-100 text-gray-800';
+                    if (row.pais_origen === 'ES') badgeClass = 'bg-yellow-100 text-yellow-800';
+                    else if (row.pais_origen === 'FR') badgeClass = 'bg-blue-100 text-blue-800';
+                    else if (row.pais_origen === 'IT') badgeClass = 'bg-green-100 text-green-800';
+                    else if ((row.pais_origen || '').includes('Export')) badgeClass = 'bg-orange-100 text-orange-800';
+
+                    // Calculate estimated costs in liters if they exist
+                    const costFrLiter = row.costo_transaccion_estimado_fr ? (row.costo_transaccion_estimado_fr / 100).toFixed(2) : '-';
+                    const costItLiter = row.costo_transaccion_estimado_it ? (row.costo_transaccion_estimado_it / 100).toFixed(2) : '-';
+
+                    tr.innerHTML = `
+                        <td class="p-4">${row.fecha}</td>
+                        <td class="p-4">
+                            <span class="px-2 py-1 rounded-full text-xs font-semibold ${badgeClass}">
+                                ${row.pais_origen}
+                            </span>
+                        </td>
+                        <td class="p-4">${row.tipo_vino}</td>
+                        <td class="p-4 text-sm text-gray-600">${row.formato || 'Granel'}</td>
+                        <td class="p-4 font-medium">${priceLiter.toFixed(2)}</td>
+                        <td class="p-4 text-gray-500">${costFrLiter}</td>
+                        <td class="p-4 text-gray-500">${costItLiter}</td>
+                        <td class="p-4 text-xs text-gray-500 truncate max-w-xs" title="${row.fuente}">${row.fuente || 'DG AGRI'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                }
+            });
+
+            // 2. Prepare Chart Data (Sorted Dates)
+            const sortedDates = Array.from(allDates).sort();
+
+            // Identify all unique series (Pais + Formato)
+            const uniqueSeries = new Set();
+            data.forEach(r => uniqueSeries.add(r.pais_origen));
+
+            const datasets = Array.from(uniqueSeries).map(seriesName => {
+                const isBottled = seriesName.includes('Embotellado');
+                const isExport = seriesName.includes('Export');
+
+                // Color Logic
+                let color = '#9CA3AF'; // Default Gray
+                if (seriesName.includes('ES')) color = '#EAB308'; // Yellow
+                if (seriesName.includes('FR')) color = '#3B82F6'; // Blue
+                if (seriesName.includes('IT')) color = '#22C55E'; // Green
+                if (seriesName.includes('PT')) color = '#EF4444'; // Red
+
+                // Specific override for "ES Export" to differ from "ES" (DG AGRI)
+                if (seriesName === 'ES Export' || seriesName === 'ES Granel') {
+                    // Since we updated main.py to output "ES Granel" for Eurostat exports?
+                    // No, main.py outputs "ES Export" (old) or "Reporter Format" (new)
+                    // Let's rely on the color logic above.
+                    // But if we have both ES (DG AGRI) and ES Granel (Eurostat), we need to distinguish.
+                    // DG AGRI is just "ES". Eurostat is "ES Granel".
+                    if (seriesName.includes('Export') || seriesName.includes('Granel') && seriesName !== 'ES') {
+                        color = '#F97316'; // Orange for ES Export/Granel to distinguish from DG AGRI Yellow
+                    }
+                }
+
+                // Line Style
+                const borderDash = isBottled ? [5, 5] : (isExport ? [2, 2] : []);
+
+                return {
+                    label: seriesName,
+                    data: sortedDates.map(d => priceMap[d]?.[seriesName] || null),
+                    borderColor: color,
+                    tension: 0.1,
+                    spanGaps: true,
+                    borderDash: borderDash,
+                    hidden: !seriesName.includes('ES') && !seriesName.includes('FR') // Hide others by default
+                };
+            });
+
+            // Update KPI (Latest available ES price - DG AGRI preferred)
+            const esSeries = datasets.find(d => d.label === 'ES');
+            if (esSeries) {
+                const validPrices = esSeries.data.filter(p => p !== null);
+                if (validPrices.length > 0) {
+                    const latestPrice = validPrices[validPrices.length - 1]; // Already in Liters
+                    document.getElementById('avg-price-es').innerText = latestPrice.toFixed(2) + ' €/l';
+                    document.getElementById('avg-price-es-filter').innerText = latestPrice.toFixed(2) + ' €/l';
+                }
+            }
+
+            // Simple ChartJS rendering
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            if (window.myChart) window.myChart.destroy(); // Destroy previous instance to avoid glitches
+            window.myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: sortedDates,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            title: { display: true, text: 'Precio (€/litro)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        loadData();
+        function downloadExcel() {
+            if (!allData || allData.length === 0) {
+                alert("No hay datos para exportar.");
+                return;
+            }
+
+            // CSV Header
+            let csvContent = "Fecha;País;Tipo;Formato;Precio (€/hl);Fuente\n";
+
+            // CSV Rows
+            allData.forEach(row => {
+                const fecha = row.fecha || '';
+                const pais = row.pais_origen || '';
+                const tipo = row.tipo_vino || '';
+                const formato = row.formato || 'Granel';
+                // Prices in data.js are strictly numbers (floats), so we format them.
+                // Excel often prefers comma for decimals in EU, but dot is standard CSV.
+                // We'll use string formatting.
+                const precio = row.precio_eur_hl ? row.precio_eur_hl.toFixed(2).replace('.', ',') : '';
+                const fuente = row.fuente || '';
+
+                // Escape quotes if necessary (simple version)
+                const rowString = `${fecha};${pais};${tipo};${formato};"${precio}";"${fuente}"`;
+                csvContent += rowString + "\n";
+            });
+
+            // BOM for Excel to recognize UTF-8
+            const bom = "\uFEFF";
+            const blob = new Blob([bom + csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            const stamp = new Date().toISOString().slice(0, 10);
+            link.setAttribute("download", `Precios_Vino_Europa_${stamp}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+
+</html>
